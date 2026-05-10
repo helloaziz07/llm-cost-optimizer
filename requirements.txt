@@ -1,0 +1,31 @@
+# Web Framework
+fastapi>=0.100.0
+uvicorn>=0.22.0
+
+# Google Cloud AI (Vertex AI — primary auth method)
+google-cloud-aiplatform>=1.38.0
+
+# Google Gemini AI (optional — for legacy API key auth)
+# google-generativeai>=0.3.0
+
+# Vector Search
+faiss-cpu>=1.7.4
+
+# Data & ML
+numpy>=1.24.0
+pandas>=2.0.0
+tiktoken>=0.5.0
+
+# Data Validation
+pydantic>=2.0.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# HTTP Client
+httpx>=0.24.0
+requests>=2.31.0
+
+# Dashboard
+streamlit>=1.28.0
+plotly>=5.18.0
