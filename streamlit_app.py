@@ -1,199 +1,361 @@
 """
 Streamlit Dashboard for LLM Cost Optimizer
-Comprehensive monitoring and query interface.
+Clean, production-ready monitoring interface.
 Run: streamlit run streamlit_app.py
 """
 import streamlit as st
 import requests
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import time
 
-# Page config
+# =============================================================================
+# Page Config
+# =============================================================================
 st.set_page_config(
     page_title="LLM Cost Optimizer",
-    page_icon="💰",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# API Base URL
-API_BASE_URL = st.sidebar.text_input("Backend URL", "http://localhost:8000")
-
-# Custom CSS for premium look
+# =============================================================================
+# Design System — Professional, Clean CSS
+# =============================================================================
 st.markdown("""
 <style>
-    /* Gradient metric cards */
-    [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    /* Global */
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    [data-testid="stMetric"] label {
-        color: #ffffff !important;
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* KPI Card Styling */
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px 24px;
+        text-align: center;
+        transition: box-shadow 0.2s ease;
+    }
+    .kpi-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .kpi-label {
+        font-size: 0.75rem;
         font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 6px;
     }
-
-    [data-testid="stMetric"] [data-testid="stMetricValue"] {
-        color: #ffffff !important;
-        font-size: 1.8rem !important;
-        font-weight: bold;
-    }
-
-    /* Different gradient colors */
-    [data-testid="column"]:nth-child(1) [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    [data-testid="column"]:nth-child(2) [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-    [data-testid="column"]:nth-child(3) [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    }
-    [data-testid="column"]:nth-child(4) [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-    }
-    [data-testid="column"]:nth-child(5) [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    }
-    [data-testid="column"]:nth-child(6) [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
-    }
-
-    /* Section headers */
-    h1, h2, h3 {
-        color: #1f1f1f;
+    .kpi-value {
+        font-size: 1.75rem;
         font-weight: 700;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+    .kpi-sub {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        margin-top: 4px;
     }
 
-    /* Dataframe styling */
-    [data-testid="stDataFrame"] {
+    /* Accent colors for KPI values */
+    .kpi-blue .kpi-value { color: #3b82f6; }
+    .kpi-emerald .kpi-value { color: #10b981; }
+    .kpi-amber .kpi-value { color: #f59e0b; }
+    .kpi-violet .kpi-value { color: #8b5cf6; }
+
+    /* Section Title */
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* Result card */
+    .result-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
         border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 20px;
+    }
+
+    /* Status badges */
+    .badge-hit {
+        display: inline-block;
+        background: #ecfdf5;
+        color: #059669;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1px solid #a7f3d0;
+    }
+    .badge-miss {
+        display: inline-block;
+        background: #fef2f2;
+        color: #dc2626;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1px solid #fecaca;
+    }
+    .badge-online {
+        display: inline-block;
+        background: #ecfdf5;
+        color: #059669;
+        font-weight: 500;
+        font-size: 0.75rem;
+        padding: 3px 10px;
+        border-radius: 20px;
+        border: 1px solid #a7f3d0;
+    }
+
+    /* Stat row inside result */
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.85rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: #64748b; font-weight: 500; }
+    .stat-value { color: #1e293b; font-weight: 600; }
+
+    /* Override Streamlit metric cards to be invisible */
+    [data-testid="stMetric"] {
+        background: transparent !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+
+    /* Clean divider */
+    .divider {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 32px 0;
+        border: none;
+    }
+
+    /* Dashboard header */
+    .dash-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+    .dash-title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+    .dash-subtitle {
+        font-size: 0.85rem;
+        color: #94a3b8;
+        margin: 0 0 24px 0;
+    }
+
+    /* Footer */
+    .footer {
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.78rem;
+        padding: 24px 0 8px;
+        border-top: 1px solid #e2e8f0;
+        margin-top: 40px;
+    }
+
+    /* Dark mode overrides */
+    @media (prefers-color-scheme: dark) {
+        .kpi-card {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        .kpi-value { color: #f1f5f9 !important; }
+        .kpi-label { color: #94a3b8; }
+        .kpi-sub { color: #64748b; }
+        .kpi-blue .kpi-value { color: #60a5fa !important; }
+        .kpi-emerald .kpi-value { color: #34d399 !important; }
+        .kpi-amber .kpi-value { color: #fbbf24 !important; }
+        .kpi-violet .kpi-value { color: #a78bfa !important; }
+        .section-title { color: #f1f5f9; border-color: #334155; }
+        .result-card { background: #1e293b; border-color: #334155; }
+        .stat-row { border-color: #334155; }
+        .stat-label { color: #94a3b8; }
+        .stat-value { color: #e2e8f0; }
+        .dash-title { color: #f1f5f9; }
+        .divider { background: #334155; }
+        .footer { border-color: #334155; }
+    }
+
+    /* Streamlit dark mode class overrides */
+    [data-theme="dark"] .kpi-card,
+    .stApp[data-theme="dark"] .kpi-card {
+        background: #1e293b;
+        border-color: #334155;
     }
 </style>
 """, unsafe_allow_html=True)
 
 
-# Helper functions
-def fetch_data(endpoint):
-    """Fetch data from API endpoint"""
+# =============================================================================
+# Helper Functions
+# =============================================================================
+def fetch(endpoint: str):
+    """Fetch data from API"""
     try:
-        response = requests.get(f"{API_BASE_URL}{endpoint}", timeout=5)
-        if response.status_code == 200:
-            return response.json()
-        return None
+        r = requests.get(f"{API_BASE_URL}{endpoint}", timeout=5)
+        return r.json() if r.status_code == 200 else None
     except Exception:
         return None
 
 
-def send_query(query_text, max_tokens=500, temperature=0.7):
-    """Send query to backend"""
+def send_query(query_text: str, max_tokens: int = 500, temperature: float = 0.7):
+    """Send query to backend pipeline"""
     try:
-        response = requests.post(
+        r = requests.post(
             f"{API_BASE_URL}/query",
-            json={
-                "query": query_text,
-                "max_tokens": max_tokens,
-                "temperature": temperature
-            },
+            json={"query": query_text, "max_tokens": max_tokens, "temperature": temperature},
             timeout=30
         )
-        if response.status_code == 200:
-            return response.json()
-        return None
+        return r.json() if r.status_code == 200 else None
     except Exception as e:
-        st.error(f"Error: {str(e)}")
+        st.error(f"Request failed: {e}")
         return None
 
 
+def kpi_card(label: str, value: str, sub: str = "", accent: str = ""):
+    """Render a clean KPI card"""
+    cls = f"kpi-card kpi-{accent}" if accent else "kpi-card"
+    html = f"""
+    <div class="{cls}">
+        <div class="kpi-label">{label}</div>
+        <div class="kpi-value">{value}</div>
+        <div class="kpi-sub">{sub}</div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+
+# =============================================================================
 # Sidebar
-st.sidebar.title("💰 Cost Optimizer")
+# =============================================================================
+API_BASE_URL = st.sidebar.text_input("Backend URL", "http://localhost:8000")
+
 st.sidebar.markdown("---")
 
-# Auto-refresh
-auto_refresh = st.sidebar.checkbox("Auto-refresh (5s)", value=False)
+if st.sidebar.button("↻  Refresh", use_container_width=True):
+    st.rerun()
+
+auto_refresh = st.sidebar.checkbox("Auto-refresh (5s)")
 if auto_refresh:
     time.sleep(5)
     st.rerun()
 
-# Manual refresh
-if st.sidebar.button("🔄 Refresh Now", use_container_width=True):
-    st.rerun()
+st.sidebar.markdown("---")
 
-# Clear cache
-if st.sidebar.button("🗑️ Clear Cache", use_container_width=True):
+if st.sidebar.button("Clear Cache", use_container_width=True):
     try:
         requests.post(f"{API_BASE_URL}/cache/clear", timeout=5)
-        st.sidebar.success("Cache cleared!")
+        st.sidebar.success("Cache cleared")
         time.sleep(1)
         st.rerun()
     except Exception:
-        st.sidebar.error("Failed to clear cache")
+        st.sidebar.error("Failed")
+
+if st.sidebar.button("Reset All Data", use_container_width=True):
+    try:
+        requests.post(f"{API_BASE_URL}/clear-all", timeout=5)
+        st.sidebar.success("All data cleared")
+        time.sleep(1)
+        st.rerun()
+    except Exception:
+        st.sidebar.error("Failed")
 
 st.sidebar.markdown("---")
 
-# Fetch data
-metrics_data = fetch_data("/metrics")
-recent_queries = fetch_data("/recent-queries?limit=20")
+# System config in sidebar
+config_data_sb = fetch("/config")
+if config_data_sb:
+    with st.sidebar.expander("System Configuration"):
+        st.json(config_data_sb)
 
-# Main title
-st.title("🎯 LLM Cost Optimizer Dashboard")
-st.markdown("*Prompt Optimization → Semantic Caching → Model Selection → Batching → LLM*")
-st.markdown("---")
 
-# Check backend connection
+# =============================================================================
+# Fetch Data
+# =============================================================================
+metrics_data = fetch("/metrics")
+recent_queries = fetch("/recent-queries?limit=20")
+
+# =============================================================================
+# Header
+# =============================================================================
+st.markdown("""
+<div class="dash-header">
+    <p class="dash-title">⚡ LLM Cost Optimizer</p>
+    <span class="badge-online">Online</span>
+</div>
+<p class="dash-subtitle">Prompt Optimization → Semantic Caching → Model Selection → LLM Execution</p>
+""", unsafe_allow_html=True)
+
+# Connection check
 if metrics_data is None:
-    st.error("❌ Cannot connect to backend. Make sure the server is running!")
-    st.code("uvicorn main:app --reload --port 8000")
+    st.error("Cannot connect to backend. Start the server with: `python -m uvicorn main:app --port 8000`")
     st.stop()
 
 # Extract metrics
-cache_metrics = metrics_data.get('cache', {})
-tracking_metrics = metrics_data.get('tracking', {})
-batching_metrics = metrics_data.get('batching', {})
-config_data = metrics_data.get('config', {})
+cache_m = metrics_data.get('cache', {})
+tracking_m = metrics_data.get('tracking', {})
+
 
 # =============================================================================
-# SECTION 1: KEY METRICS
+# SECTION 1: KPI Cards
 # =============================================================================
-st.header("📊 Real-Time System Metrics")
+c1, c2, c3, c4 = st.columns(4)
 
-col1, col2, col3, col4, col5, col6 = st.columns(6)
+total_queries = tracking_m.get('total_queries', 0)
+hit_rate = cache_m.get('hit_rate', 0) * 100
+total_cost = cache_m.get('total_cost', 0)
+cost_saved = cache_m.get('total_cost_saved', 0)
+cost_reduction = cache_m.get('cost_reduction_percent', 0)
+cache_hits = cache_m.get('cache_hits', 0)
+cache_misses = cache_m.get('cache_misses', 0)
 
-with col1:
-    st.metric("Total Queries", tracking_metrics.get('total_queries', 0))
+with c1:
+    kpi_card("Total Queries", str(total_queries), f"{cache_hits} hits · {cache_misses} misses", "blue")
 
-with col2:
-    hit_rate = cache_metrics.get('hit_rate', 0) * 100
-    st.metric("Cache Hit Rate", f"{hit_rate:.1f}%")
+with c2:
+    kpi_card("Cache Hit Rate", f"{hit_rate:.1f}%", f"{cost_reduction:.1f}% cost reduction", "emerald")
 
-with col3:
-    st.metric("Cache Hits", cache_metrics.get('cache_hits', 0))
+with c3:
+    kpi_card("Total Cost", f"${total_cost:.4f}", f"{cache_m.get('llm_tokens_used', 0)} tokens used", "amber")
 
-with col4:
-    st.metric("Cache Misses", cache_metrics.get('cache_misses', 0))
+with c4:
+    kpi_card("Cost Saved", f"${cost_saved:.4f}", f"{cache_m.get('llm_tokens_saved', 0)} tokens saved", "violet")
 
-with col5:
-    total_cost = cache_metrics.get('total_cost', 0)
-    st.metric("Total Cost", f"${total_cost:.4f}")
-
-with col6:
-    cost_saved = cache_metrics.get('total_cost_saved', 0)
-    st.metric("Cost Saved", f"${cost_saved:.4f}")
 
 # =============================================================================
-# SECTION 2: QUERY INPUT PANEL
+# SECTION 2: Test Query Panel
 # =============================================================================
-st.markdown("---")
-st.header("🧪 Test Query Panel")
+st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+st.markdown('<p class="section-title">Test Query</p>', unsafe_allow_html=True)
 
-# Initialize session state for query result
 if 'last_result' not in st.session_state:
     st.session_state.last_result = None
 if 'last_query' not in st.session_state:
@@ -201,309 +363,197 @@ if 'last_query' not in st.session_state:
 
 with st.form("query_form"):
     query_input = st.text_area(
-        "Enter your query:",
-        placeholder="Example: Explain the concept of machine learning in simple terms...",
-        height=100
+        "Enter your query",
+        placeholder="e.g. Explain the concept of machine learning in simple terms...",
+        height=80,
+        label_visibility="collapsed"
     )
 
-    col1, col2 = st.columns(2)
-    with col1:
+    fc1, fc2, fc3 = st.columns([2, 2, 1])
+    with fc1:
         max_tokens = st.slider("Max Tokens", 50, 1000, 500)
-    with col2:
+    with fc2:
         temperature = st.slider("Temperature", 0.0, 1.0, 0.7)
+    with fc3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        submitted = st.form_submit_button("Send Query", use_container_width=True)
 
-    col_submit, col_clear = st.columns(2)
-    with col_submit:
-        submit_button = st.form_submit_button("🚀 Send Query", use_container_width=True)
-    with col_clear:
-        clear_button = st.form_submit_button("🗑️ Clear Result", use_container_width=True)
-
-if submit_button and query_input:
-    with st.spinner("Processing query through pipeline..."):
+if submitted and query_input:
+    with st.spinner("Processing..."):
         result = send_query(query_input, max_tokens, temperature)
         if result:
             st.session_state.last_result = result
             st.session_state.last_query = query_input
 
-if clear_button:
-    st.session_state.last_result = None
-    st.session_state.last_query = None
-    st.rerun()
-
-# Display result if available
+# Display result
 if st.session_state.last_result:
-    result = st.session_state.last_result
+    res = st.session_state.last_result
+    cached = res.get('cached', False)
 
-    display_query = st.session_state.last_query
-    if len(display_query) > 80:
-        display_query = display_query[:80] + "..."
-    st.subheader(f"📝 Query: {display_query}")
+    col_resp, col_stats = st.columns([3, 1])
 
-    col1, col2 = st.columns([2, 1])
+    with col_resp:
+        st.markdown('<div class="result-card">', unsafe_allow_html=True)
+        st.markdown(res.get('response', ''))
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    with col1:
-        st.markdown("**Response:**")
-        st.write(result.get('response', ''))
+    with col_stats:
+        badge = '<span class="badge-hit">Cache Hit</span>' if cached else '<span class="badge-miss">Cache Miss</span>'
+        st.markdown(badge, unsafe_allow_html=True)
 
-    with col2:
-        st.markdown("**📊 Query Metrics**")
+        stats_html = '<div style="margin-top: 12px;">'
 
-        cached = result.get('cached', False)
-        if cached:
-            st.success("✅ CACHE HIT")
-            st.write(f"**Similarity:** {result.get('similarity_score', 0):.4f}")
-        else:
-            st.error("❌ CACHE MISS")
-            st.write(f"**Model:** {result.get('selected_model', 'N/A')}")
+        if cached and res.get('similarity_score'):
+            stats_html += f"""
+            <div class="stat-row"><span class="stat-label">Similarity</span><span class="stat-value">{res['similarity_score']:.4f}</span></div>
+            """
+        if res.get('selected_model'):
+            stats_html += f"""
+            <div class="stat-row"><span class="stat-label">Model</span><span class="stat-value">{res['selected_model']}</span></div>
+            """
 
-        st.write(f"**Tokens Used:** {result.get('tokens_used', 0)}")
-        st.write(f"**Tokens Saved:** {result.get('tokens_saved', 0)}")
-        st.write(f"**Cost:** ${result.get('cost', 0):.6f}")
-        st.write(f"**Cost Saved:** ${result.get('cost_saved', 0):.6f}")
-        st.write(f"**Latency:** {result.get('latency_ms', 0):.2f}ms")
+        stats_html += f"""
+        <div class="stat-row"><span class="stat-label">Tokens Used</span><span class="stat-value">{res.get('tokens_used', 0)}</span></div>
+        <div class="stat-row"><span class="stat-label">Tokens Saved</span><span class="stat-value">{res.get('tokens_saved', 0)}</span></div>
+        <div class="stat-row"><span class="stat-label">Cost</span><span class="stat-value">${res.get('cost', 0):.6f}</span></div>
+        <div class="stat-row"><span class="stat-label">Saved</span><span class="stat-value">${res.get('cost_saved', 0):.6f}</span></div>
+        <div class="stat-row"><span class="stat-label">Latency</span><span class="stat-value">{res.get('latency_ms', 0):.1f}ms</span></div>
+        </div>
+        """
+        st.markdown(stats_html, unsafe_allow_html=True)
+
+    if st.button("Clear Result", key="clear_result"):
+        st.session_state.last_result = None
+        st.session_state.last_query = None
+        st.rerun()
+
 
 # =============================================================================
-# SECTION 3: RECENT 20 QUERIES
+# SECTION 3: Cost & Token Analytics
 # =============================================================================
-st.markdown("---")
-st.header("📜 Recent 20 Queries — Complete Tracking")
+st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+st.markdown('<p class="section-title">Analytics</p>', unsafe_allow_html=True)
+
+chart_c1, chart_c2 = st.columns(2)
+
+palette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6']
+
+with chart_c1:
+    cost_actual = cache_m.get('total_cost', 0)
+    cost_saved_val = cache_m.get('total_cost_saved', 0)
+
+    if cost_actual + cost_saved_val > 0:
+        fig = go.Figure(data=[go.Pie(
+            labels=['Actual Cost', 'Cost Saved'],
+            values=[cost_actual, cost_saved_val],
+            hole=0.55,
+            marker=dict(colors=[palette[2], palette[1]]),
+            textinfo='label+percent',
+            textfont=dict(size=13, family='Inter'),
+            hovertemplate='%{label}: $%{value:.6f}<extra></extra>'
+        )])
+        fig.update_layout(
+            title=dict(text='Cost Breakdown', font=dict(size=15, family='Inter', color='#475569')),
+            showlegend=False,
+            height=300,
+            margin=dict(t=50, b=20, l=20, r=20),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No cost data yet — send some queries first")
+
+with chart_c2:
+    tokens_used = cache_m.get('llm_tokens_used', 0)
+    tokens_saved = cache_m.get('llm_tokens_saved', 0)
+
+    if tokens_used + tokens_saved > 0:
+        fig = go.Figure(data=[go.Pie(
+            labels=['Tokens Used', 'Tokens Saved'],
+            values=[tokens_used, tokens_saved],
+            hole=0.55,
+            marker=dict(colors=[palette[0], palette[3]]),
+            textinfo='label+percent',
+            textfont=dict(size=13, family='Inter'),
+            hovertemplate='%{label}: %{value:,}<extra></extra>'
+        )])
+        fig.update_layout(
+            title=dict(text='Token Usage', font=dict(size=15, family='Inter', color='#475569')),
+            showlegend=False,
+            height=300,
+            margin=dict(t=50, b=20, l=20, r=20),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No token data yet — send some queries first")
+
+
+# =============================================================================
+# SECTION 4: Recent Queries Table
+# =============================================================================
+st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+st.markdown('<p class="section-title">Recent Queries</p>', unsafe_allow_html=True)
 
 if recent_queries and recent_queries.get('queries'):
     queries = recent_queries['queries']
+    df = pd.DataFrame(queries)
 
-    # Create DataFrame for display
-    df_queries = pd.DataFrame(queries)
+    if not df.empty:
+        # Select columns
+        cols = ['query_id', 'original_prompt', 'cache_hit', 'selected_model',
+                'llm_cost', 'cost_saved', 'total_time_ms', 'status']
+        available = [c for c in cols if c in df.columns]
+        display = df[available].copy()
 
-    if not df_queries.empty:
-        # Select and rename columns for display
-        display_cols = [
-            'query_id', 'timestamp', 'original_prompt', 'cache_hit',
-            'cache_similarity', 'selected_model', 'llm_tokens',
-            'llm_cost', 'cost_saved', 'total_time_ms', 'status'
-        ]
+        # Rename for clean headers
+        rename_map = {
+            'query_id': 'ID',
+            'original_prompt': 'Query',
+            'cache_hit': 'Cached',
+            'selected_model': 'Model',
+            'llm_cost': 'Cost',
+            'cost_saved': 'Saved',
+            'total_time_ms': 'Latency (ms)',
+            'status': 'Status'
+        }
+        display.rename(columns={k: v for k, v in rename_map.items() if k in display.columns}, inplace=True)
 
-        available_cols = [c for c in display_cols if c in df_queries.columns]
-        df_display = df_queries[available_cols].copy()
+        # Format cached column as text badges
+        if 'Cached' in display.columns:
+            display['Cached'] = display['Cached'].apply(lambda x: '✓ Hit' if x else '✗ Miss')
 
-        # Style the dataframe
-        def highlight_cache(row):
-            if row.get('cache_hit', False):
-                return ['background-color: #06d638'] * len(row)
-            else:
-                return ['background-color: #ed071c'] * len(row)
+        # Format latency
+        if 'Latency (ms)' in display.columns:
+            display['Latency (ms)'] = display['Latency (ms)'].apply(lambda x: f"{x:.0f}" if pd.notna(x) else "—")
 
-        styled_df = df_display.style.apply(highlight_cache, axis=1)
-        st.dataframe(styled_df, use_container_width=True, height=400)
-
-        # Summary stats
-        col1, col2, col3, col4 = st.columns(4)
-
-        cache_hits = df_display[df_display['cache_hit'] == True].shape[0] if 'cache_hit' in df_display.columns else 0
-        cache_misses = df_display[df_display['cache_hit'] == False].shape[0] if 'cache_hit' in df_display.columns else 0
-
-        with col1:
-            st.metric("Recent Hits", cache_hits)
-        with col2:
-            st.metric("Recent Misses", cache_misses)
-        with col3:
-            avg_time = df_display['total_time_ms'].mean() if 'total_time_ms' in df_display.columns else 0
-            st.metric("Avg Response Time", f"{avg_time:.0f}ms")
-        with col4:
-            st.metric("Queries Shown", len(df_display))
+        st.dataframe(
+            display,
+            use_container_width=True,
+            height=min(400, 50 + len(display) * 35),
+            hide_index=True,
+            column_config={
+                "ID": st.column_config.TextColumn(width="small"),
+                "Query": st.column_config.TextColumn(width="large"),
+                "Cached": st.column_config.TextColumn(width="small"),
+                "Model": st.column_config.TextColumn(width="medium"),
+                "Cost": st.column_config.TextColumn(width="small"),
+                "Saved": st.column_config.TextColumn(width="small"),
+                "Latency (ms)": st.column_config.TextColumn(width="small"),
+                "Status": st.column_config.TextColumn(width="small"),
+            }
+        )
 else:
-    st.info("No queries yet. Send some queries using the test panel above!")
+    st.info("No queries yet — use the test panel above to send your first query")
+
 
 # =============================================================================
-# SECTION 4: CACHE DETAILS
+# Footer
 # =============================================================================
-st.markdown("---")
-st.header("🗄️ Semantic Cache Details")
-
-cache_stats = fetch_data("/cache/stats")
-cache_entries = fetch_data("/cache/entries?limit=20")
-
-if cache_stats:
-    col1, col2, col3 = st.columns(3)
-
-    stats = cache_stats.get('stats', {})
-
-    with col1:
-        st.metric("Cache Entries", stats.get('total_entries', 0))
-        st.metric("Avg Hits/Entry", stats.get('avg_hits_per_entry', 0))
-
-    with col2:
-        st.metric("Tokens Saved", cache_metrics.get('llm_tokens_saved', 0))
-        st.metric("Total Evictions", cache_metrics.get('evictions', 0))
-
-    with col3:
-        thresholds = cache_stats.get('thresholds', {})
-        st.write("**Adaptive Thresholds:**")
-        st.write(f"• Short queries: {thresholds.get('short', 0.85):.2f}")
-        st.write(f"• Medium queries: {thresholds.get('medium', 0.80):.2f}")
-        st.write(f"• Long queries: {thresholds.get('long', 0.75):.2f}")
-
-# Cache entries table
-if cache_entries and cache_entries.get('entries'):
-    st.subheader("📋 Cache Entries")
-    entries_df = pd.DataFrame(cache_entries['entries'])
-    st.dataframe(entries_df, use_container_width=True)
-
-# =============================================================================
-# SECTION 5: CACHE EVICTION TRACKING
-# =============================================================================
-st.markdown("---")
-st.header("🗑️ Cache Eviction Tracking")
-
-eviction_data = fetch_data("/cache/evictions?limit=10")
-
-col1, col2 = st.columns([1, 3])
-
-with col1:
-    total_evictions = cache_metrics.get('evictions', 0)
-    st.metric("Total Evictions", total_evictions)
-
-    cache_size = cache_metrics.get('cache_size', 0)
-    st.metric("Current Cache Size", cache_size)
-
-    if total_evictions > 0:
-        st.info(f"💡 {total_evictions} entries removed to optimize cache performance")
-
-with col2:
-    if eviction_data and eviction_data.get('evictions'):
-        evictions = eviction_data['evictions']
-
-        st.subheader("📜 Recent 10 Evicted Queries")
-
-        eviction_records = []
-        for i, ev in enumerate(evictions[-10:], 1):
-            eviction_records.append({
-                "#": i,
-                "Query": ev.get('query', '')[:60] + "..." if len(ev.get('query', '')) > 60 else ev.get('query', ''),
-                "Hits": ev.get('hits', 0),
-                "Age (hrs)": ev.get('age_hours', 0),
-                "Reason": ev.get('reason', 'Low value score'),
-                "Evicted At": ev.get('timestamp', 'N/A')[:19] if ev.get('timestamp') else 'N/A'
-            })
-
-        if eviction_records:
-            eviction_df = pd.DataFrame(eviction_records)
-
-            def style_eviction(row):
-                reason = row.get('Reason', '')
-                if 'Low value' in reason:
-                    return ['background-color: #fac92d'] * len(row)
-                elif 'TTL' in reason or 'expired' in reason.lower():
-                    return ['background-color: #f0293b'] * len(row)
-                else:
-                    return ['background-color: #316feb'] * len(row)
-
-            styled_eviction = eviction_df.style.apply(style_eviction, axis=1)
-            st.dataframe(styled_eviction, use_container_width=True, height=350)
-
-            st.markdown("**Eviction Reasons Legend:**")
-            st.markdown("- 🟡 **Low value score**: Entry had few hits, old age, or low similarity matches")
-            st.markdown("- 🔴 **TTL expired**: Entry exceeded time-to-live limit")
-            st.markdown("- ⚪ **Other**: Manual eviction or cache clear")
-    else:
-        st.info("No evictions yet. Cache will evict entries when it reaches maximum capacity.")
-
-# =============================================================================
-# SECTION 6: BATCHING STATS
-# =============================================================================
-st.markdown("---")
-st.header("📦 Batching Statistics")
-
-batching_stats = fetch_data("/batching/stats")
-
-if batching_stats:
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Total Batches", batching_stats.get('total_batches_created', 0))
-    with col2:
-        st.metric("Requests Batched", batching_stats.get('total_requests_batched', 0))
-    with col3:
-        st.metric("Avg Batch Size", batching_stats.get('avg_batch_size', 0))
-
-    # Batches by model
-    batches_by_model = batching_stats.get('batches_by_model', {})
-    if batches_by_model:
-        st.subheader("Batches by Model")
-        model_df = pd.DataFrame([
-            {"Model": k, "Batches": v}
-            for k, v in batches_by_model.items()
-        ])
-
-        fig = px.bar(model_df, x='Model', y='Batches',
-                     title='Batch Distribution by Model',
-                     color='Batches',
-                     color_continuous_scale='Viridis')
-        st.plotly_chart(fig, use_container_width=True)
-
-# =============================================================================
-# SECTION 7: COST ANALYTICS
-# =============================================================================
-st.markdown("---")
-st.header("💰 Cost Analytics")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    cost_data = {
-        'Category': ['Actual Cost', 'Cost Saved'],
-        'Amount': [
-            cache_metrics.get('total_cost', 0),
-            cache_metrics.get('total_cost_saved', 0)
-        ]
-    }
-
-    if sum(cost_data['Amount']) > 0:
-        fig = px.pie(
-            values=cost_data['Amount'],
-            names=cost_data['Category'],
-            title='Cost Distribution',
-            color_discrete_sequence=['#ff6384', '#36a2eb']
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No cost data yet")
-
-with col2:
-    token_data = {
-        'Category': ['Tokens Used', 'Tokens Saved'],
-        'Count': [
-            cache_metrics.get('llm_tokens_used', 0),
-            cache_metrics.get('llm_tokens_saved', 0)
-        ]
-    }
-
-    if sum(token_data['Count']) > 0:
-        fig = px.pie(
-            values=token_data['Count'],
-            names=token_data['Category'],
-            title='Token Usage Distribution',
-            color_discrete_sequence=['#ff9f40', '#4bc0c0']
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No token data yet")
-
-# =============================================================================
-# SECTION 8: SYSTEM CONFIGURATION
-# =============================================================================
-st.markdown("---")
-st.header("⚙️ System Configuration")
-
-with st.expander("View Current Configuration"):
-    st.json(config_data)
-
-# =============================================================================
-# FOOTER
-# =============================================================================
-st.markdown("---")
 st.markdown("""
-<div style='text-align: center; color: #666; padding: 20px;'>
-    <p>💰 LLM Cost Optimizer v1.0.0</p>
-    <p>Prompt Optimization • Semantic Caching • Model Selection • Request Batching</p>
+<div class="footer">
+    LLM Cost Optimizer v1.0 · Prompt Optimization · Semantic Caching · Model Selection · LLM Execution
 </div>
 """, unsafe_allow_html=True)
