@@ -162,6 +162,29 @@ async def get_batching_stats() -> Dict[str, Any]:
     return pipeline.batcher.get_stats()
 
 
+@app.get("/batching/details")
+async def get_batch_details() -> Dict[str, Any]:
+    """Get detailed batch information for all closed batches"""
+    batches = []
+    for batch in pipeline.batcher._closed_batches:
+        batches.append({
+            "batch_id": batch.batch_id,
+            "model": batch.model_name,
+            "size": batch.size,
+            "close_reason": batch.close_reason or "—",
+            "total_tokens": batch.total_input_tokens,
+            "queries": [
+                {
+                    "id": req.request_id,
+                    "prompt": req.optimized_prompt[:80],
+                    "tokens": req.token_count,
+                }
+                for req in batch.requests
+            ],
+        })
+    return {"total": len(batches), "batches": batches}
+
+
 @app.get("/config")
 async def get_config() -> Dict[str, Any]:
     """Get current configuration"""

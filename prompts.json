@@ -1,0 +1,46 @@
+{
+  "description": "LLM Cost Optimizer — Load Test Prompts",
+  "notes": "Organized in 3 waves to demonstrate caching, batching, and model selection",
+
+  "wave_1": {
+    "label": "Initial Queries — All Cache Misses, Diverse Intents",
+    "prompts": [
+      {"query": "Explain how gradient descent works in neural network training", "intent": "reasoning"},
+      {"query": "Write a Python function to implement binary search on a sorted array", "intent": "coding"},
+      {"query": "Summarize the key differences between SQL and NoSQL databases", "intent": "summarization"},
+      {"query": "What are the main causes of climate change and their effects?", "intent": "factual"},
+      {"query": "Analyze the time complexity of quicksort in best, average, and worst cases", "intent": "data_analysis"},
+      {"query": "Write a creative short story about an AI discovering emotions", "intent": "creative"},
+      {"query": "How does Docker containerization differ from virtual machines?", "intent": "reasoning"},
+      {"query": "Build a REST API endpoint in FastAPI that handles user authentication", "intent": "coding"}
+    ]
+  },
+
+  "wave_2": {
+    "label": "Repeat & Similar Queries — Cache Hits Expected",
+    "prompts": [
+      {"query": "Explain how gradient descent works in neural network training", "intent": "reasoning", "expect": "cache_hit"},
+      {"query": "Write a Python function to implement binary search on a sorted array", "intent": "coding", "expect": "cache_hit"},
+      {"query": "Summarize the key differences between SQL and NoSQL databases", "intent": "summarization", "expect": "cache_hit"},
+      {"query": "What are the main causes of climate change and their effects?", "intent": "factual", "expect": "cache_hit"},
+      {"query": "Analyze the time complexity of quicksort in best, average, and worst cases", "intent": "data_analysis", "expect": "cache_hit"},
+      {"query": "Write a creative short story about an AI discovering emotions", "intent": "creative", "expect": "cache_hit"},
+      {"query": "How does Docker containerization differ from virtual machines?", "intent": "reasoning", "expect": "cache_hit"},
+      {"query": "Build a REST API endpoint in FastAPI that handles user authentication", "intent": "coding", "expect": "cache_hit"}
+    ]
+  },
+
+  "wave_3": {
+    "label": "New Queries — Fresh Cache Misses, More Intents",
+    "prompts": [
+      {"query": "Explain the CAP theorem in distributed systems with examples", "intent": "reasoning"},
+      {"query": "Write a Python decorator that implements retry logic with exponential backoff", "intent": "coding"},
+      {"query": "Summarize the benefits and risks of large language models in healthcare", "intent": "summarization"},
+      {"query": "Compare transformer architecture with recurrent neural networks", "intent": "data_analysis"},
+      {"query": "What is Kubernetes and how does it orchestrate containers at scale?", "intent": "factual"},
+      {"query": "Design a database schema for an e-commerce platform with products, orders, and users", "intent": "coding"},
+      {"query": "Explain the concept of attention mechanism in transformers", "intent": "reasoning"},
+      {"query": "Write a brief overview of microservices architecture vs monolithic architecture", "intent": "summarization"}
+    ]
+  }
+}
